@@ -16,11 +16,11 @@ local Window = Rayfield:CreateWindow({
         FileName = "Example"
     },
     Discord = {
-        Enabled = false,
-        Invite = "noinvitelink",
+        Enabled = True,
+        Invite = "https://discord.gg/ugUgfHxA",
         RememberJoins = true
     },
-    KeySystem = false,
+    KeySystem = True,
     KeySettings = {
         Title = "Key",
         Subtitle = "Key System",
