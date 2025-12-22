@@ -1,0 +1,153 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+
+local Window = Rayfield:CreateWindow({
+    Name = "Kyron Scripts",
+    Icon = 0,
+    LoadingTitle = "Kyron Scripts",
+    LoadingSubtitle = "by Kyron",
+    ShowText = "Rayfield",
+    Theme = "Default",
+    ToggleUIKeybind = "K",
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = nil,
+        FileName = "Example"
+    },
+    Discord = {
+        Enabled = false,
+        Invite = "noinvitelink",
+        RememberJoins = true
+    },
+    KeySystem = false,
+    KeySettings = {
+        Title = "Key",
+        Subtitle = "Key System",
+        Note = "join discord  https://discord.gg/ugUgfHxA",
+        FileName = "Key",
+        SaveKey = true,
+        GrabKeyFromSite = false,
+        Key = {"67"}
+    }
+})
+
+local Tab = Window:CreateTab("Player", 4483362458)
+
+Tab:CreateSlider({
+    Name = "Player Speed",
+    Range = {16, 100},
+    Increment = 10,
+    Suffix = "Speed",
+    CurrentValue = 16,
+    Flag = "Slider1",
+    Callback = function(Value)
+        game.Players.LocalPlayer.Character.Humanoid.WalkSpeed = Value
+    end,
+})
+
+Tab:CreateSlider({
+    Name = "Jump Power",
+    Range = {50, 500},
+    Increment = 10,
+    Suffix = "Jump Power",
+    CurrentValue = 50,
+    Flag = "Slider2",
+    Callback = function(Value)
+        game.Players.LocalPlayer.Character.Humanoid.JumpPower = Value
+    end,
+})
+
+local ESPTab = Window:CreateTab("ESP", 4483362458)
+
+local Sense = loadstring(game:HttpGet("https://sirius.menu/sense"))()
+
+local enemy = Sense.teamSettings.enemy
+local friendly = Sense.teamSettings.friendly
+
+local shared = Sense.sharedSettings
+shared.textSize = shared.textSize or 13
+shared.textFont = shared.textFont or 2
+shared.limitDistance = shared.limitDistance or false
+shared.maxDistance = shared.maxDistance or 250
+shared.useTeamColor = shared.useTeamColor or false
+
+local friendlyToggle = ESPTab:CreateToggle({
+    Name = "Friendly ESP",
+    CurrentValue = false,
+    Callback = function(val)
+        friendly.enabled = val
+    end
+})
+
+ESPTab:CreateToggle({
+    Name = "Enable ESP",
+    CurrentValue = false,
+    Callback = function(val)
+        if val then
+            enemy.enabled = true
+            enemy.box = true
+            enemy.box3d = false
+            enemy.name = true
+            enemy.distance = false
+            enemy.tracer = true
+            enemy.weapon = false
+            enemy.healthBar = false
+            enemy.healthText = false
+            enemy.offScreenArrow = false
+            enemy.chams = false
+            enemy.outline = true
+
+            friendly.enabled = friendlyToggle.CurrentValue
+
+            shared.limitDistance = false
+            shared.maxDistance = 1000
+            shared.useTeamColor = false
+
+            Sense.Load()
+        else
+            enemy.enabled = false
+            friendly.enabled = false
+        end
+    end
+})
+
+local function addEnemyToggle(name, key)
+    ESPTab:CreateToggle({
+        Name = name,
+        CurrentValue = enemy[key] or false,
+        Callback = function(val)
+            enemy[key] = val
+        end
+    })
+end
+
+local enemyFeatures = {
+    "box","box3d","name","distance","tracer",
+    "weapon","healthBar","healthText",
+    "offScreenArrow","chams","outline"
+}
+
+for _, feature in ipairs(enemyFeatures) do
+    addEnemyToggle(feature:gsub("^%l", string.upper) .. " ESP", feature)
+end
+
+ESPTab:CreateToggle({
+    Name = "Use Distance Limit",
+    CurrentValue = shared.limitDistance,
+    Callback = function(val)
+        shared.limitDistance = val
+    end
+})
+
+ESPTab:CreateSlider({
+    Name = "Max Distance",
+    Range = {50, 1000},
+    Increment = 25,
+    Suffix = "Studs",
+    CurrentValue = shared.maxDistance,
+    Flag = "MaxDistanceESP",
+    Callback = function(val)
+        shared.maxDistance = val
+    end
+})
