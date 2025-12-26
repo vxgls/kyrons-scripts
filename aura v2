@@ -240,6 +240,42 @@ FunTab:CreateSlider({
 	end
 })
 
+-----------------------
+-- CAMERA FOV CHANGER
+-----------------------
+local FOVValue = Camera.FieldOfView
+local LastFOV = FOVValue
+
+FunTab:CreateSlider({
+	Name = "Camera FOV",
+	Range = {70, 200},
+	Increment = 1,
+	Suffix = "",
+	CurrentValue = FOVValue,
+	Callback = function(v)
+		FOVValue = v
+		Camera.FieldOfView = v
+	end
+})
+
+local function onCharacterAdded(char)
+	local humanoid = char:WaitForChild("Humanoid")
+	-- Restore FOV on respawn
+	Camera.FieldOfView = LastFOV
+	FOVValue = LastFOV
+
+	humanoid.Died:Connect(function()
+		-- Store FOV at death
+		LastFOV = Camera.FieldOfView
+	end)
+end
+
+if LocalPlayer.Character then
+	onCharacterAdded(LocalPlayer.Character)
+end
+
+LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
+
 ------------------------------------------------
 -- TELEPORT TAB (AUTO ENEMY & TEAM TELEPORT)
 ------------------------------------------------
@@ -271,14 +307,12 @@ RunService.RenderStepped:Connect(function()
 	if not character or not character:FindFirstChild("HumanoidRootPart") then return end
 	local hrp = character.HumanoidRootPart
 
-	-- Function to get position 5 studs behind a target
 	local function getBehindPosition(targetHRP, distance)
 		local lookVector = targetHRP.CFrame.LookVector
 		local newPos = targetHRP.Position - lookVector * distance
-		return CFrame.new(newPos + Vector3.new(0,3,0)) -- 3 studs above ground to avoid getting stuck
+		return CFrame.new(newPos + Vector3.new(0,3,0))
 	end
 
-	-- Enemy teleport
 	if AutoTeleportEnabled then
 		local closestEnemy = nil
 		local shortestDistance = math.huge
@@ -300,7 +334,6 @@ RunService.RenderStepped:Connect(function()
 		end
 	end
 
-	-- Teammate teleport
 	if AutoTeleportTeamEnabled then
 		local closestTeammate = nil
 		local shortestDistance = math.huge
