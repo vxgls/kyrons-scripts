@@ -1,3 +1,5 @@
+
+------------------------------------------------
 -- SERVICES
 ------------------------------------------------
 local Players = game:GetService("Players")
@@ -46,8 +48,8 @@ local function createESP(player)
 
 	local gui = Instance.new("BillboardGui")
 	gui.Adornee = head
-	gui.Size = UDim2.new(0, 120, 0, 30) -- smaller size
-	gui.StudsOffset = Vector3.new(0, 2, 0) -- slightly lower
+	gui.Size = UDim2.new(0, 200, 0, 50)
+	gui.StudsOffset = Vector3.new(0, 2.5, 0)
 	gui.AlwaysOnTop = true
 	gui.Parent = ESPFolder
 
@@ -59,7 +61,6 @@ local function createESP(player)
 	txt.TextStrokeTransparency = 0
 	txt.TextColor3 = player.Team == LocalPlayer.Team and Color3.fromRGB(0,0,255) or Color3.fromRGB(255,0,0)
 	txt.Text = player.Name
-	txt.TextSize = 14 -- smaller text
 	txt.Parent = gui
 end
 
@@ -175,107 +176,6 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
------------------------
--- PLAYER CHAMS
------------------------
-local ChamsEnabled = false
-FunTab:CreateToggle({
-	Name = "Player Chams",
-	Callback = function(v)
-		ChamsEnabled = v
-	end
-})
-
-RunService.RenderStepped:Connect(function()
-	if not ChamsEnabled then return end
-	for _, p in ipairs(Players:GetPlayers()) do
-		if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
-			for _, part in ipairs(p.Character:GetChildren()) do
-				if part:IsA("BasePart") and not part:FindFirstChild("Cham") then
-					local cham = Instance.new("BoxHandleAdornment")
-					cham.Name = "Cham"
-					cham.Adornee = part
-					cham.Size = part.Size
-					cham.Transparency = 0.5
-					cham.Color3 = p.Team == LocalPlayer.Team and Color3.fromRGB(0,0,255) or Color3.fromRGB(255,0,0)
-					cham.AlwaysOnTop = true
-					cham.Parent = part
-				end
-			end
-		end
-	end
-end)
-
-------------------------------------------------
--- WALK SPEED & JUMP POWER (FUN TAB)
-------------------------------------------------
-local speed = 16
-local jumpPower = 50
-
-FunTab:CreateSlider({
-	Name = "Walk Speed",
-	Range = {16, 200},
-	Increment = 1,
-	Suffix = "Studs/s",
-	CurrentValue = speed,
-	Callback = function(v)
-		speed = v
-		if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-			LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = speed
-		end
-	end
-})
-
-FunTab:CreateSlider({
-	Name = "Jump Power",
-	Range = {50, 500},
-	Increment = 5,
-	Suffix = "Studs",
-	CurrentValue = jumpPower,
-	Callback = function(v)
-		jumpPower = v
-		if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
-			LocalPlayer.Character:FindFirstChildOfClass("Humanoid").JumpPower = jumpPower
-		end
-	end
-})
-
------------------------
--- CAMERA FOV CHANGER
------------------------
-local FOVValue = Camera.FieldOfView
-local LastFOV = FOVValue
-
-FunTab:CreateSlider({
-	Name = "Camera FOV",
-	Range = {70, 200},
-	Increment = 1,
-	Suffix = "",
-	CurrentValue = FOVValue,
-	Callback = function(v)
-		FOVValue = v
-		Camera.FieldOfView = v
-	end
-})
-
-local function onCharacterAdded(char)
-	local humanoid = char:WaitForChild("Humanoid")
-	-- Restore FOV on respawn
-	Camera.FieldOfView = LastFOV
-	FOVValue = LastFOV
-
-	humanoid.Died:Connect(function()
-		-- Store FOV at death
-		LastFOV = Camera.FieldOfView
-	end)
-end
-
-if LocalPlayer.Character then
-	onCharacterAdded(LocalPlayer.Character)
-end
-
-LocalPlayer.CharacterAdded:Connect(onCharacterAdded)
-
 ------------------------------------------------
 -- TELEPORT TAB (AUTO ENEMY & TEAM TELEPORT)
 ------------------------------------------------
@@ -307,12 +207,7 @@ RunService.RenderStepped:Connect(function()
 	if not character or not character:FindFirstChild("HumanoidRootPart") then return end
 	local hrp = character.HumanoidRootPart
 
-	local function getBehindPosition(targetHRP, distance)
-		local lookVector = targetHRP.CFrame.LookVector
-		local newPos = targetHRP.Position - lookVector * distance
-		return CFrame.new(newPos + Vector3.new(0,3,0))
-	end
-
+	-- Enemy teleport
 	if AutoTeleportEnabled then
 		local closestEnemy = nil
 		local shortestDistance = math.huge
@@ -330,10 +225,11 @@ RunService.RenderStepped:Connect(function()
 			end
 		end
 		if closestEnemy then
-			hrp.CFrame = getBehindPosition(closestEnemy, 5)
+			hrp.CFrame = closestEnemy.CFrame * CFrame.new(0, 0, -3)
 		end
 	end
 
+	-- Teammate teleport
 	if AutoTeleportTeamEnabled then
 		local closestTeammate = nil
 		local shortestDistance = math.huge
@@ -351,7 +247,7 @@ RunService.RenderStepped:Connect(function()
 			end
 		end
 		if closestTeammate then
-			hrp.CFrame = getBehindPosition(closestTeammate, 5)
+			hrp.CFrame = closestTeammate.CFrame * CFrame.new(0, 0, -3)
 		end
 	end
 end)
