@@ -15,8 +15,8 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 
 local Window = Rayfield:CreateWindow({
-	Name = "Studio Tools",
-	LoadingTitle = "Studio Tools",
+	Name = "ky X freeblock",
+	LoadingTitle = "Kys scripts",
 	LoadingSubtitle = "Fun / Strucid",
 	ConfigurationSaving = { Enabled = false }
 })
