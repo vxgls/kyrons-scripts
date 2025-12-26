@@ -1,4 +1,3 @@
-------------------------------------------------
 -- SERVICES
 ------------------------------------------------
 local Players = game:GetService("Players")
@@ -15,9 +14,9 @@ local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
 
 local Window = Rayfield:CreateWindow({
-	Name = "ky X freeblock",
-	LoadingTitle = "Kys scripts",
-	LoadingSubtitle = "Fun / Strucid",
+	Name = "Kyrons scripts",
+	LoadingTitle = "Kyron x freeblock",
+	LoadingSubtitle = "fun scripts x strucid (ky)",
 	ConfigurationSaving = { Enabled = false }
 })
 
@@ -34,24 +33,21 @@ local SHOW_TEAMMATES = true
 local ESPFolder = Instance.new("Folder", workspace)
 ESPFolder.Name = "ESPFolder"
 
--- Clear previous ESP
 local function clearESP()
 	for _, v in ipairs(ESPFolder:GetChildren()) do
 		v:Destroy()
 	end
 end
 
--- Create ESP for a player
 local function createESP(player)
 	if not player.Character then return end
 	local head = player.Character:FindFirstChild("Head")
 	if not head then return end
 
-	-- BillboardGui above the head
 	local gui = Instance.new("BillboardGui")
 	gui.Adornee = head
-	gui.Size = UDim2.new(0, 200, 0, 50)
-	gui.StudsOffset = Vector3.new(0, 2.5, 0)
+	gui.Size = UDim2.new(0, 120, 0, 30) -- smaller size
+	gui.StudsOffset = Vector3.new(0, 2, 0) -- slightly lower
 	gui.AlwaysOnTop = true
 	gui.Parent = ESPFolder
 
@@ -63,10 +59,10 @@ local function createESP(player)
 	txt.TextStrokeTransparency = 0
 	txt.TextColor3 = player.Team == LocalPlayer.Team and Color3.fromRGB(0,0,255) or Color3.fromRGB(255,0,0)
 	txt.Text = player.Name
+	txt.TextSize = 14 -- smaller text
 	txt.Parent = gui
 end
 
--- Update ESP
 RunService.RenderStepped:Connect(function()
 	clearESP()
 	if ESP_ENABLED and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
@@ -80,7 +76,6 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
--- ESP Toggles
 FunTab:CreateToggle({
 	Name = "ESP (Show Names Above Players)",
 	Callback = function(v)
@@ -180,39 +175,153 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
-------------------------------------------------
--- TELEPORT TAB (TYPE DISPLAY NAME)
-------------------------------------------------
-local TeleportTab = Window:CreateTab("Teleport", 4483362458)
-local targetDisplayName = ""
-
-TeleportTab:CreateInput({
-	Name = "Enter Player Display Name",
-	PlaceholderText = "Type display name here...",
-	RemoveTextAfterFocusLost = false,
-	Callback = function(value)
-		targetDisplayName = value
+-----------------------
+-- PLAYER CHAMS
+-----------------------
+local ChamsEnabled = false
+FunTab:CreateToggle({
+	Name = "Player Chams",
+	Callback = function(v)
+		ChamsEnabled = v
 	end
 })
 
-TeleportTab:CreateButton({
-	Name = "Teleport",
-	Callback = function()
-		local targetPlayer
-		for _, p in ipairs(Players:GetPlayers()) do
-			if p.DisplayName:lower() == targetDisplayName:lower() then
-				targetPlayer = p
-				break
+RunService.RenderStepped:Connect(function()
+	if not ChamsEnabled then return end
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
+			for _, part in ipairs(p.Character:GetChildren()) do
+				if part:IsA("BasePart") and not part:FindFirstChild("Cham") then
+					local cham = Instance.new("BoxHandleAdornment")
+					cham.Name = "Cham"
+					cham.Adornee = part
+					cham.Size = part.Size
+					cham.Transparency = 0.5
+					cham.Color3 = p.Team == LocalPlayer.Team and Color3.fromRGB(0,0,255) or Color3.fromRGB(255,0,0)
+					cham.AlwaysOnTop = true
+					cham.Parent = part
+				end
 			end
 		end
-		if targetPlayer and targetPlayer.Character and targetPlayer.Character:FindFirstChild("HumanoidRootPart") then
-			LocalPlayer.Character.HumanoidRootPart.CFrame =
-				targetPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-3)
-		else
-			warn("Player not found or not in-game!")
+	end
+end)
+
+------------------------------------------------
+-- WALK SPEED & JUMP POWER (FUN TAB)
+------------------------------------------------
+local speed = 16
+local jumpPower = 50
+
+FunTab:CreateSlider({
+	Name = "Walk Speed",
+	Range = {16, 200},
+	Increment = 1,
+	Suffix = "Studs/s",
+	CurrentValue = speed,
+	Callback = function(v)
+		speed = v
+		if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+			LocalPlayer.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = speed
 		end
 	end
 })
+
+FunTab:CreateSlider({
+	Name = "Jump Power",
+	Range = {50, 500},
+	Increment = 5,
+	Suffix = "Studs",
+	CurrentValue = jumpPower,
+	Callback = function(v)
+		jumpPower = v
+		if LocalPlayer.Character and LocalPlayer.Character:FindFirstChildOfClass("Humanoid") then
+			LocalPlayer.Character:FindFirstChildOfClass("Humanoid").JumpPower = jumpPower
+		end
+	end
+})
+
+------------------------------------------------
+-- TELEPORT TAB (AUTO ENEMY & TEAM TELEPORT)
+------------------------------------------------
+local TeleportTab = Window:CreateTab("Teleport", 4483362458)
+
+-- Auto teleport to enemies toggle
+local AutoTeleportEnabled = false
+
+TeleportTab:CreateToggle({
+    Name = "Auto Teleport to Enemies",
+    Callback = function(v)
+        AutoTeleportEnabled = v
+    end
+})
+
+-- Auto teleport to teammates toggle
+local AutoTeleportTeamEnabled = false
+
+TeleportTab:CreateToggle({
+    Name = "Auto Teleport to Teammates",
+    Callback = function(v)
+        AutoTeleportTeamEnabled = v
+    end
+})
+
+-- Auto teleport loop
+RunService.RenderStepped:Connect(function()
+	local character = LocalPlayer.Character
+	if not character or not character:FindFirstChild("HumanoidRootPart") then return end
+	local hrp = character.HumanoidRootPart
+
+	-- Function to get position 5 studs behind a target
+	local function getBehindPosition(targetHRP, distance)
+		local lookVector = targetHRP.CFrame.LookVector
+		local newPos = targetHRP.Position - lookVector * distance
+		return CFrame.new(newPos + Vector3.new(0,3,0)) -- 3 studs above ground to avoid getting stuck
+	end
+
+	-- Enemy teleport
+	if AutoTeleportEnabled then
+		local closestEnemy = nil
+		local shortestDistance = math.huge
+		for _, p in ipairs(Players:GetPlayers()) do
+			if p ~= LocalPlayer and p.Team ~= LocalPlayer.Team and p.Character then
+				local enemyHRP = p.Character:FindFirstChild("HumanoidRootPart")
+				local hum = p.Character:FindFirstChildOfClass("Humanoid")
+				if enemyHRP and hum and hum.Health > 0 then
+					local distance = (hrp.Position - enemyHRP.Position).Magnitude
+					if distance < shortestDistance then
+						shortestDistance = distance
+						closestEnemy = enemyHRP
+					end
+				end
+			end
+		end
+		if closestEnemy then
+			hrp.CFrame = getBehindPosition(closestEnemy, 5)
+		end
+	end
+
+	-- Teammate teleport
+	if AutoTeleportTeamEnabled then
+		local closestTeammate = nil
+		local shortestDistance = math.huge
+		for _, p in ipairs(Players:GetPlayers()) do
+			if p ~= LocalPlayer and p.Team == LocalPlayer.Team and p.Character then
+				local teammateHRP = p.Character:FindFirstChild("HumanoidRootPart")
+				local hum = p.Character:FindFirstChildOfClass("Humanoid")
+				if teammateHRP and hum and hum.Health > 0 then
+					local distance = (hrp.Position - teammateHRP.Position).Magnitude
+					if distance < shortestDistance then
+						shortestDistance = distance
+						closestTeammate = teammateHRP
+					end
+				end
+			end
+		end
+		if closestTeammate then
+			hrp.CFrame = getBehindPosition(closestTeammate, 5)
+		end
+	end
+end)
 
 ------------------------------------------------
 -- STRUCID TAB
