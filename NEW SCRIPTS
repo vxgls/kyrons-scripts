@@ -1,0 +1,347 @@
+------------------------------------------------
+-- SERVICES
+------------------------------------------------
+local Players = game:GetService("Players")
+local LocalPlayer = Players.LocalPlayer
+local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
+local Camera = workspace.CurrentCamera
+local Workspace = game:GetService("Workspace")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+
+------------------------------------------------
+-- LOAD RAYFIELD
+------------------------------------------------
+local Rayfield = loadstring(game:HttpGet("https://sirius.menu/rayfield"))()
+
+local Window = Rayfield:CreateWindow({
+	Name = "Studio Tools",
+	LoadingTitle = "Studio Tools",
+	LoadingSubtitle = "Strucid",
+	ConfigurationSaving = { Enabled = false }
+})
+
+------------------------------------------------
+-- FUN TAB
+------------------------------------------------
+local FunTab = Window:CreateTab("Fun", 4483362458)
+
+------------------------------------------------
+-- OPTIMIZED ESP
+------------------------------------------------
+local ESP_ENABLED = false
+local SHOW_TEAM = true
+local ESPFolder = Instance.new("Folder", Workspace)
+ESPFolder.Name = "ESPFolder"
+
+local ESPObjects = {}
+
+local function removeESP(player)
+	if ESPObjects[player] then
+		for _, v in pairs(ESPObjects[player]) do
+			if typeof(v) == "Instance" then
+				v:Destroy()
+			end
+		end
+		ESPObjects[player] = nil
+	end
+end
+
+local function createESP(player)
+	if ESPObjects[player] or not player.Character then return end
+
+	local char = player.Character
+	local head = char:FindFirstChild("Head")
+	local hum = char:FindFirstChildOfClass("Humanoid")
+	if not head or not hum then return end
+
+	local box = Instance.new("BoxHandleAdornment")
+	box.Adornee = char
+	box.Size = Vector3.new(2,3,1)
+	box.AlwaysOnTop = true
+	box.Transparency = 0.4
+	box.Parent = ESPFolder
+
+	local gui = Instance.new("BillboardGui", ESPFolder)
+	gui.Adornee = head
+	gui.Size = UDim2.new(0,230,0,55)
+	gui.StudsOffset = Vector3.new(0,3,0)
+	gui.AlwaysOnTop = true
+
+	local txt = Instance.new("TextLabel", gui)
+	txt.Size = UDim2.new(1,0,1,0)
+	txt.BackgroundTransparency = 1
+	txt.TextStrokeTransparency = 0
+	txt.TextScaled = true
+	txt.Font = Enum.Font.SourceSansBold
+
+	ESPObjects[player] = {
+		Box = box,
+		Label = txt,
+		Head = head,
+		Humanoid = hum
+	}
+end
+
+RunService.RenderStepped:Connect(function()
+	if not ESP_ENABLED then
+		for p in pairs(ESPObjects) do removeESP(p) end
+		return
+	end
+
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer and p.Character then
+			if not SHOW_TEAM and p.Team == LocalPlayer.Team then
+				removeESP(p)
+				continue
+			end
+
+			createESP(p)
+			local data = ESPObjects[p]
+			if data then
+				local dist = (Camera.CFrame.Position - data.Head.Position).Magnitude
+				local col = (p.Team == LocalPlayer.Team) and Color3.fromRGB(0,170,255) or Color3.fromRGB(255,60,60)
+				data.Box.Color = col
+				data.Label.TextColor3 = col
+				data.Label.Text = string.format(
+					"%s\nHP: %d | %.0f studs",
+					p.Name,
+					data.Humanoid.Health,
+					dist
+				)
+			end
+		else
+			removeESP(p)
+		end
+	end
+end)
+
+Players.PlayerRemoving:Connect(removeESP)
+
+FunTab:CreateToggle({
+	Name = "ESP",
+	Callback = function(v) ESP_ENABLED = v end
+})
+
+FunTab:CreateToggle({
+	Name = "Teammates ESP",
+	Callback = function(v) SHOW_TEAM = v end
+})
+
+------------------------------------------------
+-- HEAD SIZE
+------------------------------------------------
+local headSize = 1
+FunTab:CreateSlider({
+	Name = "Enemy Head Size",
+	Range = {1,5},
+	Increment = 0.1,
+	CurrentValue = headSize,
+	Callback = function(v) headSize = v end
+})
+
+RunService.RenderStepped:Connect(function()
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer and p.Character then
+			local h = p.Character:FindFirstChild("Head")
+			if h then
+				h.Size = Vector3.new(headSize, headSize, headSize)
+			end
+		end
+	end
+end)
+
+------------------------------------------------
+-- STICKY AIMBOT (RMB)
+------------------------------------------------
+local StickyAim = false
+local HoldingRMB = false
+local Smooth = 0.35
+
+FunTab:CreateToggle({
+	Name = "Sticky Aimbot (RMB)",
+	Callback = function(v) StickyAim = v end
+})
+
+UserInputService.InputBegan:Connect(function(i)
+	if i.UserInputType == Enum.UserInputType.MouseButton2 then HoldingRMB = true end
+end)
+
+UserInputService.InputEnded:Connect(function(i)
+	if i.UserInputType == Enum.UserInputType.MouseButton2 then HoldingRMB = false end
+end)
+
+local function getClosestEnemy()
+	local mouse = UserInputService:GetMouseLocation()
+	local closest, dist = nil, math.huge
+
+	for _, p in ipairs(Players:GetPlayers()) do
+		if p ~= LocalPlayer and p.Team ~= LocalPlayer.Team and p.Character then
+			local head = p.Character:FindFirstChild("Head")
+			local hum = p.Character:FindFirstChildOfClass("Humanoid")
+			if head and hum and hum.Health > 0 then
+				local pos, onScreen = Camera:WorldToViewportPoint(head.Position)
+				if onScreen then
+					local d = (Vector2.new(pos.X,pos.Y) - mouse).Magnitude
+					if d < dist then
+						dist = d
+						closest = head
+					end
+				end
+			end
+		end
+	end
+	return closest
+end
+
+RunService.RenderStepped:Connect(function()
+	if StickyAim and HoldingRMB then
+		local t = getClosestEnemy()
+		if t then
+			Camera.CFrame = Camera.CFrame:Lerp(
+				CFrame.new(Camera.CFrame.Position, t.Position),
+				Smooth
+			)
+		end
+	end
+end)
+
+------------------------------------------------
+-- TELEPORT TAB
+------------------------------------------------
+local TeleportTab = Window:CreateTab("Teleport", 4483362458)
+local selected
+
+TeleportTab:CreateDropdown({
+	Name = "Select Player",
+	Options = Players:GetPlayers(),
+	Callback = function(o) selected = o[1] end
+})
+
+TeleportTab:CreateButton({
+	Name = "Teleport",
+	Callback = function()
+		local p = Players:FindFirstChild(selected)
+		if p and p.Character then
+			LocalPlayer.Character.HumanoidRootPart.CFrame =
+				p.Character.HumanoidRootPart.CFrame * CFrame.new(0,0,-3)
+		end
+	end
+})
+
+------------------------------------------------
+-- STRUCID TAB
+------------------------------------------------
+local StrucidTab = Window:CreateTab("Strucid", 4483362458)
+
+-- Fly
+local Fly, BV = false, nil
+StrucidTab:CreateToggle({
+	Name = "Fly",
+	Callback = function(v)
+		Fly = v
+		local hrp = LocalPlayer.Character.HumanoidRootPart
+		if v then
+			BV = Instance.new("BodyVelocity", hrp)
+			BV.MaxForce = Vector3.new(1e5,1e5,1e5)
+		elseif BV then
+			BV:Destroy()
+		end
+	end
+})
+
+RunService.RenderStepped:Connect(function()
+	if Fly and BV then
+		local d = Vector3.zero
+		if UserInputService:IsKeyDown(Enum.KeyCode.W) then d += Camera.CFrame.LookVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.S) then d -= Camera.CFrame.LookVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.A) then d -= Camera.CFrame.RightVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.D) then d += Camera.CFrame.RightVector end
+		BV.Velocity = d * 60
+	end
+end)
+
+-- Flags
+StrucidTab:CreateButton({
+	Name = "Blue Flag",
+	Callback = function()
+		LocalPlayer.Character.HumanoidRootPart.CFrame =
+			Workspace.Map.Terrain.FlagBases.BlueBase.CFrame * CFrame.new(0,2,0)
+	end
+})
+
+StrucidTab:CreateButton({
+	Name = "Red Flag",
+	Callback = function()
+		LocalPlayer.Character.HumanoidRootPart.CFrame =
+			Workspace.Map.Terrain.FlagBases.RedBase.CFrame * CFrame.new(0,2,0)
+	end
+})
+
+-- Ghost Guns
+StrucidTab:CreateButton({
+	Name = "Ghost Guns",
+	Callback = function()
+		local TARGET = {Body1=true,Body2=true,Body3=true,Mag=true}
+		for _, r in ipairs({Workspace,ReplicatedStorage}) do
+			for _, o in ipairs(r:GetDescendants()) do
+				if o:IsA("BasePart") and TARGET[o.Name] then
+					o.Material = Enum.Material.ForceField
+				end
+			end
+		end
+	end
+})
+
+-- Rainbow Bullets
+local RB = false
+StrucidTab:CreateToggle({
+	Name = "Rainbow Bullets",
+	Callback = function(v) RB = v end
+})
+
+local hue = 0
+RunService.Heartbeat:Connect(function(dt)
+	if RB then
+		hue += dt
+		local c = ColorSequence.new(Color3.fromHSV(hue%1,1,1))
+		local beam = ReplicatedStorage.Props.Bullet.Beam
+		beam.Color = c
+	end
+end)
+
+-- Bring All Loot
+StrucidTab:CreateButton({
+	Name = "Bring All Loot",
+	Callback = function()
+		local hrp = LocalPlayer.Character.HumanoidRootPart
+		local names = {"Wood","Medium","Heavy","Small","Center"}
+		local i = 0
+		for _, p in ipairs(Workspace:GetDescendants()) do
+			if p:IsA("BasePart") and table.find(names,p.Name) then
+				p.CFrame = hrp.CFrame * CFrame.new(i*0.2,0,-2)
+				i += 1
+			end
+		end
+	end
+})
+
+------------------------------------------------
+-- PICKAXE SELECTOR
+------------------------------------------------
+local PickaxeTab = Window:CreateTab("Pickaxe Selector", 4483362458)
+
+local models = ReplicatedStorage.Pickaxes.Models
+local weapon = ReplicatedStorage.Weapons.Assets.Pickaxe
+
+for _, m in ipairs(models:GetChildren()) do
+	PickaxeTab:CreateButton({
+		Name = m.Name,
+		Callback = function()
+			weapon:ClearAllChildren()
+			for _, c in ipairs(m:GetChildren()) do
+				c:Clone().Parent = weapon
+			end
+		end
+	})
+end
