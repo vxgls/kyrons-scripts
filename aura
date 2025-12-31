@@ -27,10 +27,10 @@ local Window = Rayfield:CreateWindow({
 local FunTab = Window:CreateTab("Fun", 4483362458)
 
 -----------------------
--- IN-GAME NAME ESP
+-- ESP
 -----------------------
 local ESP_ENABLED = false
-local SHOW_TEAMMATES = false -- default off
+local SHOW_TEAMMATES = false
 local ESPFolder = Instance.new("Folder", workspace)
 ESPFolder.Name = "ESPFolder"
 local ESPObjects = {}
@@ -91,49 +91,41 @@ local function removeESP(player)
 	end
 end
 
--- ESP Refresh every 5 seconds
 task.spawn(function()
 	while true do
 		if ESP_ENABLED and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
+			local currentPlayers = {}
 			for _, p in ipairs(Players:GetPlayers()) do
 				if p ~= LocalPlayer and p.Character and p.Character:FindFirstChild("HumanoidRootPart") then
 					if p.Team ~= LocalPlayer.Team or SHOW_TEAMMATES then
+						currentPlayers[p] = true
 						if not ESPObjects[p] then
 							createESP(p)
 						end
-					else
-						removeESP(p)
 					end
 				end
 			end
-		else
-			for player, gui in pairs(ESPObjects) do
-				gui:Destroy()
+			for player, _ in pairs(ESPObjects) do
+				if not currentPlayers[player] then
+					removeESP(player)
+				end
 			end
-			ESPObjects = {}
+		else
+			for player, _ in pairs(ESPObjects) do
+				removeESP(player)
+			end
 		end
-		task.wait(5)
+		task.wait(0.1)
 	end
 end)
 
 FunTab:CreateToggle({
 	Name = "ESP (Enemies)",
-	Callback = function(v)
-		ESP_ENABLED = v
-		if not v then
-			for _, gui in pairs(ESPObjects) do
-				gui:Destroy()
-			end
-			ESPObjects = {}
-		end
-	end
+	Callback = function(v) ESP_ENABLED = v end
 })
-
 FunTab:CreateToggle({
 	Name = "Show Teammates",
-	Callback = function(v)
-		SHOW_TEAMMATES = v
-	end
+	Callback = function(v) SHOW_TEAMMATES = v end
 })
 
 -----------------------
@@ -142,12 +134,10 @@ FunTab:CreateToggle({
 local headSize = 2
 FunTab:CreateSlider({
 	Name = "Enemy Head Size",
-	Range = {0,5},
+	Range = {0,6},
 	Increment = 0.1,
 	CurrentValue = headSize,
-	Callback = function(v)
-		headSize = v
-	end
+	Callback = function(v) headSize = v end
 })
 
 RunService.RenderStepped:Connect(function()
@@ -155,11 +145,91 @@ RunService.RenderStepped:Connect(function()
 		if p ~= LocalPlayer and p.Character then
 			local head = p.Character:FindFirstChild("Head")
 			if head then
-				head.Size = Vector3.new(headSize, headSize, headSize)
+				local mesh = head:FindFirstChildOfClass("SpecialMesh")
+				if mesh then
+					mesh.Scale = Vector3.new(headSize, headSize, headSize)
+				elseif head:IsA("MeshPart") then
+					head.Size = Vector3.new(headSize, headSize, headSize)
+				else
+					local newMesh = Instance.new("SpecialMesh")
+					newMesh.MeshType = Enum.MeshType.Head
+					newMesh.Scale = Vector3.new(headSize, headSize, headSize)
+					newMesh.Parent = head
+				end
 			end
 		end
 	end
 end)
+
+-----------------------
+-- HITBOX RESIZER
+-----------------------
+local hitboxEnabled = false
+local hitboxSize = 5
+
+local function applyHitbox(p)
+	if p == LocalPlayer then return end
+	local char = p.Character
+	if char then
+		local hrp = char:FindFirstChild("HumanoidRootPart")
+		if hrp then
+			hrp.Size = Vector3.new(hitboxSize, hitboxSize, hitboxSize)
+		end
+	end
+end
+
+FunTab:CreateToggle({
+	Name = "Hitbox Resizer",
+	Callback = function(v)
+		hitboxEnabled = v
+		if not v then
+			for _, p in ipairs(Players:GetPlayers()) do
+				if p ~= LocalPlayer and p.Character then
+					local hrp = p.Character:FindFirstChild("HumanoidRootPart")
+					if hrp then
+						hrp.Size = Vector3.new(2,2,1)
+					end
+				end
+			end
+		end
+	end
+})
+
+FunTab:CreateSlider({
+	Name = "Hitbox Size",
+	Range = {0,50},
+	Increment = 1,
+	CurrentValue = hitboxSize,
+	Callback = function(v)
+		hitboxSize = v
+	end
+})
+
+RunService.RenderStepped:Connect(function()
+	if hitboxEnabled then
+		for _, p in ipairs(Players:GetPlayers()) do
+			applyHitbox(p)
+		end
+	end
+end)
+
+Players.PlayerAdded:Connect(function(p)
+	p.CharacterAdded:Connect(function()
+		if hitboxEnabled then
+			applyHitbox(p)
+		end
+	end)
+end)
+
+for _, p in ipairs(Players:GetPlayers()) do
+	if p ~= LocalPlayer then
+		p.CharacterAdded:Connect(function()
+			if hitboxEnabled then
+				applyHitbox(p)
+			end
+		end)
+	end
+end
 
 -----------------------
 -- STICKY AIMBOT
@@ -170,21 +240,14 @@ local StickySmoothness = 0.35
 
 FunTab:CreateToggle({
 	Name = "Sticky Enemy Aimbot (RMB)",
-	Callback = function(v)
-		StickyAimEnabled = v
-	end
+	Callback = function(v) StickyAimEnabled = v end
 })
 
 UserInputService.InputBegan:Connect(function(i)
-	if i.UserInputType == Enum.UserInputType.MouseButton2 then
-		HoldingRMB = true
-	end
+	if i.UserInputType == Enum.UserInputType.MouseButton2 then HoldingRMB = true end
 end)
-
 UserInputService.InputEnded:Connect(function(i)
-	if i.UserInputType == Enum.UserInputType.MouseButton2 then
-		HoldingRMB = false
-	end
+	if i.UserInputType == Enum.UserInputType.MouseButton2 then HoldingRMB = false end
 end)
 
 local function getClosestEnemy()
@@ -220,25 +283,14 @@ RunService.RenderStepped:Connect(function()
 end)
 
 ------------------------------------------------
--- TELEPORT TAB (AUTO ENEMY & TEAM TELEPORT)
+-- TELEPORT TAB
 ------------------------------------------------
 local TeleportTab = Window:CreateTab("Teleport", 4483362458)
-
 local AutoTeleportEnabled = false
-TeleportTab:CreateToggle({
-    Name = "Auto Teleport to Enemies",
-    Callback = function(v)
-        AutoTeleportEnabled = v
-    end
-})
-
 local AutoTeleportTeamEnabled = false
-TeleportTab:CreateToggle({
-    Name = "Auto Teleport to Teammates",
-    Callback = function(v)
-        AutoTeleportTeamEnabled = v
-    end
-})
+
+TeleportTab:CreateToggle({Name="Auto Teleport to Enemies", Callback=function(v) AutoTeleportEnabled=v end})
+TeleportTab:CreateToggle({Name="Auto Teleport to Teammates", Callback=function(v) AutoTeleportTeamEnabled=v end})
 
 RunService.RenderStepped:Connect(function()
 	local character = LocalPlayer.Character
@@ -246,44 +298,44 @@ RunService.RenderStepped:Connect(function()
 	local hrp = character.HumanoidRootPart
 
 	if AutoTeleportEnabled then
-		local closestEnemy = nil
-		local shortestDistance = math.huge
-		for _, p in ipairs(Players:GetPlayers()) do
-			if p ~= LocalPlayer and p.Team ~= LocalPlayer.Team and p.Character then
-				local enemyHRP = p.Character:FindFirstChild("HumanoidRootPart")
-				local hum = p.Character:FindFirstChildOfClass("Humanoid")
-				if enemyHRP and hum and hum.Health > 0 then
-					local distance = (hrp.Position - enemyHRP.Position).Magnitude
-					if distance < shortestDistance then
-						shortestDistance = distance
-						closestEnemy = enemyHRP
+		local closestEnemy=nil
+		local shortestDistance=math.huge
+		for _,p in ipairs(Players:GetPlayers()) do
+			if p~=LocalPlayer and p.Team~=LocalPlayer.Team and p.Character then
+				local enemyHRP=p.Character:FindFirstChild("HumanoidRootPart")
+				local hum=p.Character:FindFirstChildOfClass("Humanoid")
+				if enemyHRP and hum and hum.Health>0 then
+					local distance=(hrp.Position-enemyHRP.Position).Magnitude
+					if distance<shortestDistance then
+						shortestDistance=distance
+						closestEnemy=enemyHRP
 					end
 				end
 			end
 		end
 		if closestEnemy then
-			hrp.CFrame = closestEnemy.CFrame * CFrame.new(0, 0, -3)
+			hrp.CFrame=closestEnemy.CFrame*CFrame.new(0,0,-3)
 		end
 	end
 
 	if AutoTeleportTeamEnabled then
-		local closestTeammate = nil
-		local shortestDistance = math.huge
-		for _, p in ipairs(Players:GetPlayers()) do
-			if p ~= LocalPlayer and p.Team == LocalPlayer.Team and p.Character then
-				local teammateHRP = p.Character:FindFirstChild("HumanoidRootPart")
-				local hum = p.Character:FindFirstChildOfClass("Humanoid")
-				if teammateHRP and hum and hum.Health > 0 then
-					local distance = (hrp.Position - teammateHRP.Position).Magnitude
-					if distance < shortestDistance then
-						shortestDistance = distance
-						closestTeammate = teammateHRP
+		local closestTeammate=nil
+		local shortestDistance=math.huge
+		for _,p in ipairs(Players:GetPlayers()) do
+			if p~=LocalPlayer and p.Team==LocalPlayer.Team and p.Character then
+				local teammateHRP=p.Character:FindFirstChild("HumanoidRootPart")
+				local hum=p.Character:FindFirstChildOfClass("Humanoid")
+				if teammateHRP and hum and hum.Health>0 then
+					local distance=(hrp.Position-teammateHRP.Position).Magnitude
+					if distance<shortestDistance then
+						shortestDistance=distance
+						closestTeammate=teammateHRP
 					end
 				end
 			end
 		end
 		if closestTeammate then
-			hrp.CFrame = closestTeammate.CFrame * CFrame.new(0, 0, -3)
+			hrp.CFrame=closestTeammate.CFrame*CFrame.new(0,0,-3)
 		end
 	end
 end)
@@ -291,142 +343,99 @@ end)
 ------------------------------------------------
 -- STRUCID TAB
 ------------------------------------------------
-local StrucidTab = Window:CreateTab("Strucid", 4483362458)
-
--- FLY
-local Fly = false
-local FlySpeed = 60
+local StrucidTab=Window:CreateTab("Strucid",4483362458)
+local Fly=false
+local FlySpeed=60
 local BV
+
 StrucidTab:CreateToggle({
-	Name = "Character Fly",
-	Callback = function(v)
-		Fly = v
-		local hrp = LocalPlayer.Character.HumanoidRootPart
+	Name="Character Fly",
+	Callback=function(v)
+		Fly=v
+		local hrp=LocalPlayer.Character.HumanoidRootPart
 		if v then
-			BV = Instance.new("BodyVelocity", hrp)
-			BV.MaxForce = Vector3.new(1e5,1e5,1e5)
+			BV=Instance.new("BodyVelocity",hrp)
+			BV.MaxForce=Vector3.new(1e5,1e5,1e5)
 		else
 			if BV then BV:Destroy() end
 		end
 	end
 })
-
 StrucidTab:CreateSlider({
-	Name = "Fly Speed",
-	Range = {10,200},
-	Increment = 5,
-	CurrentValue = FlySpeed,
-	Suffix = "Studs",
-	Callback = function(v)
-		FlySpeed = v
-	end
+	Name="Fly Speed",
+	Range={10,200},
+	Increment=5,
+	CurrentValue=FlySpeed,
+	Suffix="Studs",
+	Callback=function(v) FlySpeed=v end
 })
 
 RunService.RenderStepped:Connect(function()
 	if Fly and BV then
-		local dir = Vector3.zero
-		if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir += Camera.CFrame.LookVector end
-		if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir -= Camera.CFrame.LookVector end
-		if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir -= Camera.CFrame.RightVector end
-		if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir += Camera.CFrame.RightVector end
-		BV.Velocity = dir * FlySpeed
+		local dir=Vector3.zero
+		if UserInputService:IsKeyDown(Enum.KeyCode.W) then dir+=Camera.CFrame.LookVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.S) then dir-=Camera.CFrame.LookVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.A) then dir-=Camera.CFrame.RightVector end
+		if UserInputService:IsKeyDown(Enum.KeyCode.D) then dir+=Camera.CFrame.RightVector end
+		BV.Velocity=dir*FlySpeed
 	end
 end)
 
--- FLAGS
-StrucidTab:CreateButton({
-	Name = "Blue Flag",
-	Callback = function()
-		LocalPlayer.Character.HumanoidRootPart.CFrame =
-			Workspace.Map.Terrain.FlagBases.BlueBase.CFrame * CFrame.new(0,2,0)
-	end
-})
+-- Flags
+StrucidTab:CreateButton({Name="Blue Flag", Callback=function()
+	LocalPlayer.Character.HumanoidRootPart.CFrame=Workspace.Map.Terrain.FlagBases.BlueBase.CFrame*CFrame.new(0,2,0)
+end})
+StrucidTab:CreateButton({Name="Red Flag", Callback=function()
+	LocalPlayer.Character.HumanoidRootPart.CFrame=Workspace.Map.Terrain.FlagBases.RedBase.CFrame*CFrame.new(0,2,0)
+end})
 
-StrucidTab:CreateButton({
-	Name = "Red Flag",
-	Callback = function()
-		LocalPlayer.Character.HumanoidRootPart.CFrame =
-			Workspace.Map.Terrain.FlagBases.RedBase.CFrame * CFrame.new(0,2,0)
-	end
-})
-
--- GHOST GUNS
-StrucidTab:CreateButton({
-	Name = "Ghost Guns",
-	Callback = function()
-		local TARGET = {Body1=true, Body2=true, Body3=true, Mag=true}
-		for _, root in ipairs({Workspace, ReplicatedStorage}) do
-			for _, obj in ipairs(root:GetDescendants()) do
-				if obj:IsA("BasePart") and TARGET[obj.Name] then
-					obj.Material = Enum.Material.ForceField
-				end
+-- Ghost Guns
+StrucidTab:CreateButton({Name="Ghost Guns", Callback=function()
+	local TARGET={Body1=true, Body2=true, Body3=true, Mag=true}
+	for _,root in ipairs({Workspace,ReplicatedStorage}) do
+		for _,obj in ipairs(root:GetDescendants()) do
+			if obj:IsA("BasePart") and TARGET[obj.Name] then
+				obj.Material=Enum.Material.ForceField
 			end
 		end
 	end
-})
+end})
 
--- RAINBOW BULLETS
-local RainbowBulletsEnabled = false
-StrucidTab:CreateToggle({
-	Name = "Rainbow Bullets",
-	Callback = function(v)
-		RainbowBulletsEnabled = v
-	end
-})
+-- Rainbow Bullets
+local RainbowBulletsEnabled=false
+StrucidTab:CreateToggle({Name="Rainbow Bullets", Callback=function(v) RainbowBulletsEnabled=v end})
 
-local ignoreFolder = Workspace:WaitForChild("IgnoreThese")
-local bulletBeam = ReplicatedStorage:WaitForChild("Props"):WaitForChild("Bullet"):WaitForChild("Beam")
-local hue = 0
+local ignoreFolder=Workspace:WaitForChild("IgnoreThese")
+local bulletBeam=ReplicatedStorage:WaitForChild("Props"):WaitForChild("Bullet"):WaitForChild("Beam")
+local hue=0
 RunService.Heartbeat:Connect(function(dt)
 	if not RainbowBulletsEnabled then return end
-	hue += dt
-	local color = ColorSequence.new(Color3.fromHSV(hue % 1,1,1))
-	for _, obj in ipairs(ignoreFolder:GetDescendants()) do
-		if obj.Name == "MuzzleFlash" and (obj:IsA("ParticleEmitter") or obj:IsA("Beam")) then
-			obj.Color = color
+	hue+=dt
+	local color=ColorSequence.new(Color3.fromHSV(hue%1,1,1))
+	for _,obj in ipairs(ignoreFolder:GetDescendants()) do
+		if obj.Name=="MuzzleFlash" and (obj:IsA("ParticleEmitter") or obj:IsA("Beam")) then
+			obj.Color=color
 		end
 	end
-	bulletBeam.Color = color
+	bulletBeam.Color=color
 end)
 
--- BRING ALL LOOT
-StrucidTab:CreateButton({
-	Name = "Bring All Loot",
-	Callback = function()
-		local character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-		local hrp = character:WaitForChild("HumanoidRootPart")
-		local partNames = {"Medium","Wood","Heavy","Center","Small"}
-		local spreadAmount = 0.2
-		local spreadIndex = 0
-		for _, part in ipairs(Workspace:GetDescendants()) do
-			if part:IsA("BasePart") and table.find(partNames, part.Name) then
-				local forwardVector = hrp.CFrame.LookVector
-				local newPos = hrp.Position + forwardVector * 2
-				local spreadVector = Vector3.new(spreadIndex * spreadAmount, 0, 0)
-				part.CFrame = CFrame.new(newPos + spreadVector)
-				spreadIndex += 1
-			end
-		end
-	end
-})
-
--- RAINBOW PARTS
-local RainbowPartsEnabled = false
-local rainbowPartsCache = {}
-local targetNames = { "wall", "floor", "pyramid", "stairs", "ramp", "walls", "floors" }
-
+-- Rainbow Parts
+local RainbowPartsEnabled=false
+local rainbowPartsCache={}
+local targetNames={"wall","floor","pyramid","stairs","ramp","walls","floors"}
 StrucidTab:CreateToggle({
-	Name = "Rainbow Parts",
-	Callback = function(v)
-		RainbowPartsEnabled = v
+	Name="Rainbow Parts",
+	Callback=function(v)
+		RainbowPartsEnabled=v
 		if v then
-			rainbowPartsCache = {}
-			for _, part in ipairs(workspace:GetDescendants()) do
+			rainbowPartsCache={}
+			for _,part in ipairs(workspace:GetDescendants()) do
 				if part:IsA("BasePart") then
-					local lowerName = part.Name:lower()
-					for _, name in ipairs(targetNames) do
-						if lowerName == name then
-							table.insert(rainbowPartsCache, part)
+					local lowerName=part.Name:lower()
+					for _,name in ipairs(targetNames) do
+						if lowerName==name then
+							table.insert(rainbowPartsCache,part)
 							break
 						end
 					end
@@ -435,15 +444,14 @@ StrucidTab:CreateToggle({
 		end
 	end
 })
-
-local rainbowHue = 0
+local rainbowHue=0
 RunService.RenderStepped:Connect(function(dt)
 	if not RainbowPartsEnabled then return end
-	rainbowHue = (rainbowHue + dt * 0.5) % 1
-	for i, part in ipairs(rainbowPartsCache) do
+	rainbowHue=(rainbowHue+dt*0.5)%1
+	for i,part in ipairs(rainbowPartsCache) do
 		if part and part.Parent then
-			local partHue = (rainbowHue + i * 0.05) % 1
-			part.Color = Color3.fromHSV(partHue, 1, 1)
+			local partHue=(rainbowHue+i*0.05)%1
+			part.Color=Color3.fromHSV(partHue,1,1)
 		end
 	end
 end)
@@ -451,25 +459,23 @@ end)
 ------------------------------------------------
 -- PICKAXE SELECTOR TAB
 ------------------------------------------------
-local PickaxeTab = Window:CreateTab("Pickaxe Selector", 4483362458)
-
-local pickaxeFolder = ReplicatedStorage:WaitForChild("Pickaxes"):WaitForChild("Models")
-local weaponPickaxe = ReplicatedStorage:WaitForChild("Weapons"):WaitForChild("Assets"):WaitForChild("Pickaxe")
-local currentSelected = nil
-
-for _, model in ipairs(pickaxeFolder:GetChildren()) do
+local PickaxeTab=Window:CreateTab("Pickaxe Selector",4483362458)
+local pickaxeFolder=ReplicatedStorage:WaitForChild("Pickaxes"):WaitForChild("Models")
+local weaponPickaxe=ReplicatedStorage:WaitForChild("Weapons"):WaitForChild("Assets"):WaitForChild("Pickaxe")
+local currentSelected=nil
+for _,model in ipairs(pickaxeFolder:GetChildren()) do
 	PickaxeTab:CreateButton({
-		Name = model.Name,
-		Callback = function()
-			if currentSelected and currentSelected ~= model then
-				for _, child in ipairs(weaponPickaxe:GetChildren()) do
+		Name=model.Name,
+		Callback=function()
+			if currentSelected and currentSelected~=model then
+				for _,child in ipairs(weaponPickaxe:GetChildren()) do
 					child:Destroy()
 				end
 			end
-			for _, child in ipairs(model:GetChildren()) do
-				child:Clone().Parent = weaponPickaxe
+			for _,child in ipairs(model:GetChildren()) do
+				child:Clone().Parent=weaponPickaxe
 			end
-			currentSelected = model
+			currentSelected=model
 		end
 	})
 end
